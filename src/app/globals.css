@@ -1,26 +1,89 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Beam design tokens (see docs/DESIGN.md).
+ * Monochrome core + one lime accent + pastel state blocks; pill CTAs;
+ * mono = taxonomy only.
+ *
+ * NOTE (2026-07-13): reconstructed after the working-tree wipe. canvas/ink/
+ * block-lime/block-navy are confirmed from surviving artifacts (compiled CSS,
+ * logo, manifest, xterm theme); the remaining pastels are close
+ * approximations — tune visually if anything looks off.
+ */
+@theme {
+  --font-sans: var(--font-inter), "SF Pro Display", system-ui, helvetica, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", menlo, monospace;
+
+  /* Monochrome core */
+  --color-canvas: #ffffff;
+  --color-ink: #000000;
+  --color-inverse-ink: #e8e6f5;
+  --color-surface-soft: #f4f3ef;
+  --color-hairline: #e7e5df;
+  --color-hairline-soft: #f1f0ea;
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+
+  /* State */
+  --color-success: #34a26b;
+  --color-danger: #e5484d;
+
+  /* Brand accent */
+  --color-accent-magenta: #e6399b;
+
+  /* Color blocks (pastel surfaces, DESIGN.md color-block usage) */
+  --color-block-lime: #d8f878;
+  --color-block-cream: #f5efe2;
+  --color-block-lilac: #e4defa;
+  --color-block-mint: #dcf2e2;
+  --color-block-pink: #fadbe4;
+  --color-block-coral: #ffd9c8;
+  --color-block-navy: #0d0c1d;
+
+  /* Radii */
+  --radius-pill: 999px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  letter-spacing: -0.14px;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
+
+/* Eyebrow / caption — mono taxonomy role: uppercase, positive tracking */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Bottom sheets — one shared frame so every sheet gets the same max
+   height and never overflows the viewport; put the long part of the
+   content in .sheet-scroll so it scrolls while header/footer stay put. */
+.sheet {
+  display: flex;
+  width: 100%;
+  max-height: 80dvh;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  padding: 20px;
+  padding-bottom: max(env(safe-area-inset-bottom), 20px);
+}
+.sheet-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Hide scrollbars on horizontal pill rows */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
