@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { ArrowUp, Folder, Home, Mic, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Folder, Home, Mic, Plus, X } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { sessionHub } from "@/lib/ws-client";
 import Sheet from "@/components/sheet";
@@ -32,17 +32,47 @@ const KEYS: Array<{ label: string; seq: string }> = [
   { label: "Enter", seq: "\r" },
 ];
 
+// Terminal font size bounds. Changing size refits xterm AND resizes the
+// PTY, so the TUI reflows to the new column count instead of clipping.
+const FONT_KEY = "beam:term-font-size";
+const FONT_MIN = 9;
+const FONT_MAX = 18;
+const FONT_DEFAULT = 12;
+
 /** One xterm instance bound to one session connection. */
-function TerminalPane({ sessionId, hidden }: { sessionId: string; hidden: boolean }) {
+function TerminalPane({
+  sessionId,
+  hidden,
+  fontSize,
+}: {
+  sessionId: string;
+  hidden: boolean;
+  fontSize: number;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const doFitRef = useRef<() => void>(() => {});
+  // Font size changes are applied to the live terminal in their own effect;
+  // the ref keeps the create-once effect below off the fontSize dependency.
+  const fontSizeRef = useRef(fontSize);
+  const [atBottom, setAtBottom] = useState(true);
+
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+    const term = termRef.current;
+    if (!term) return;
+    term.options.fontSize = fontSize;
+    doFitRef.current();
+  }, [fontSize]);
 
   useEffect(() => {
     const host = hostRef.current;
     const conn = sessionHub.get(sessionId);
     if (!host || !conn) return;
+    let disposed = false;
 
     const term = new Terminal({
-      fontSize: 12,
+      fontSize: fontSizeRef.current,
       fontFamily: "var(--font-mono), Menlo, monospace",
       lineHeight: 1.25,
       cursorBlink: true,
@@ -61,10 +91,19 @@ function TerminalPane({ sessionId, hidden }: { sessionId: string; hidden: boolea
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
+    termRef.current = term;
+
+    // "At bottom" = viewport is following live output; drives the
+    // jump-to-latest button while reading scrollback.
+    const updateAtBottom = () => {
+      const buf = term.buffer.active;
+      setAtBottom(buf.viewportY >= buf.baseY);
+    };
 
     // Typing directly in the terminal also works (hardware keyboards).
     const dataSub = term.onData((d) => conn.sendRaw(d));
-    const unsubStdout = conn.onStdout((chunk) => term.write(chunk));
+    const unsubStdout = conn.onStdout((chunk) => term.write(chunk, updateAtBottom));
+    const scrollSub = term.onScroll(updateAtBottom);
 
     // Keep the PTY size in sync with the rendered terminal. Skip while the
     // pane is hidden (display:none → zero size would corrupt the geometry);
@@ -75,8 +114,21 @@ function TerminalPane({ sessionId, hidden }: { sessionId: string; hidden: boolea
       conn.sendResize(term.cols, term.rows);
     };
     doFit();
+    doFitRef.current = doFit;
     const ro = new ResizeObserver(doFit);
     ro.observe(host);
+
+    // The first fit above may have measured a fallback font: until the mono
+    // webfont loads, cell width is wrong, so the PTY gets the wrong column
+    // count and the TUI hard-wraps at the wrong width (broken fragments in
+    // scrollback). Once fonts are in, force xterm to re-measure and refit.
+    void document.fonts?.ready.then(() => {
+      if (disposed) return;
+      const size = term.options.fontSize ?? fontSizeRef.current;
+      term.options.fontSize = size + 1; // toggle forces char re-measure
+      term.options.fontSize = size;
+      doFit();
+    });
 
     // xterm.js only scrolls on wheel events — add touch scrolling for
     // mobile: drag gestures scroll the scrollback buffer line by line.
@@ -92,28 +144,56 @@ function TerminalPane({ sessionId, hidden }: { sessionId: string; hidden: boolea
       const delta = (touchY - y) / cellHeight + touchCarry;
       const lines = Math.trunc(delta);
       touchCarry = delta - lines;
-      if (lines !== 0) term.scrollLines(lines);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        updateAtBottom();
+      }
       touchY = y;
       e.preventDefault(); // keep the page itself from scrolling/bouncing
     };
+    // Touch is read-and-scroll only: suppress the synthetic click that
+    // would focus xterm's hidden textarea and summon the virtual keyboard.
+    // Mobile input goes through the prompt bar and shortcut keys; desktop
+    // mouse clicks (hardware keyboards) are unaffected.
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+    };
     host.addEventListener("touchstart", onTouchStart, { passive: true });
     host.addEventListener("touchmove", onTouchMove, { passive: false });
+    host.addEventListener("touchend", onTouchEnd, { passive: false });
 
     return () => {
+      disposed = true;
       host.removeEventListener("touchstart", onTouchStart);
       host.removeEventListener("touchmove", onTouchMove);
+      host.removeEventListener("touchend", onTouchEnd);
       ro.disconnect();
       dataSub.dispose();
+      scrollSub.dispose();
       unsubStdout();
       term.dispose();
+      termRef.current = null;
+      doFitRef.current = () => {};
     };
   }, [sessionId]);
 
   return (
-    <div
-      ref={hostRef}
-      className={hidden ? "hidden" : "h-full min-h-0 px-2 pt-2"}
-    />
+    <div className={hidden ? "hidden" : "relative h-full min-h-0"}>
+      <div ref={hostRef} className="h-full min-h-0 px-2 pt-2" />
+      {/* Jump back to live output after scrolling up through scrollback */}
+      {!atBottom && (
+        <button
+          onClick={() => {
+            termRef.current?.scrollToBottom();
+            setAtBottom(true);
+          }}
+          aria-label="Jump to latest output"
+          className="absolute bottom-3 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white/90 backdrop-blur active:bg-white/30"
+        >
+          <ArrowDown size={16} strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -124,6 +204,21 @@ export default function TerminalView() {
   const [input, setInput] = useState("");
   const [killTarget, setKillTarget] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Saved font size; nothing in the SSR markup depends on it, so reading
+  // localStorage in the initializer is hydration-safe.
+  const [fontSize, setFontSize] = useState(() => {
+    if (typeof window === "undefined") return FONT_DEFAULT;
+    const saved = Number(window.localStorage.getItem(FONT_KEY));
+    return saved >= FONT_MIN && saved <= FONT_MAX ? saved : FONT_DEFAULT;
+  });
+
+  function bumpFont(delta: number) {
+    setFontSize((s) => {
+      const next = Math.min(FONT_MAX, Math.max(FONT_MIN, s + delta));
+      localStorage.setItem(FONT_KEY, String(next));
+      return next;
+    });
+  }
 
   const voiceBase = useRef("");
   const onTranscript = useCallback((text: string, final: boolean) => {
@@ -185,7 +280,12 @@ export default function TerminalView() {
       {/* Terminal panes — all mounted, one visible */}
       <div className="min-h-0 flex-1">
         {sessions.map((s) => (
-          <TerminalPane key={s.id} sessionId={s.id} hidden={s.id !== active?.id} />
+          <TerminalPane
+            key={s.id}
+            sessionId={s.id}
+            hidden={s.id !== active?.id}
+            fontSize={fontSize}
+          />
         ))}
       </div>
 
@@ -200,6 +300,21 @@ export default function TerminalView() {
             {k.label}
           </TapButton>
         ))}
+        <span className="my-1 w-px shrink-0 bg-white/15" />
+        <TapButton
+          onTap={() => bumpFont(-1)}
+          aria-label="Smaller terminal text"
+          className="h-8 shrink-0 rounded-md bg-white/10 px-3 font-mono text-[12px] font-medium text-white/90 active:bg-white/25"
+        >
+          A−
+        </TapButton>
+        <TapButton
+          onTap={() => bumpFont(1)}
+          aria-label="Larger terminal text"
+          className="h-8 shrink-0 rounded-md bg-white/10 px-3 font-mono text-[12px] font-medium text-white/90 active:bg-white/25"
+        >
+          A+
+        </TapButton>
       </div>
 
       {/* Chat-style prompt bar (bottom) */}
