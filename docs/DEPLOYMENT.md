@@ -14,14 +14,23 @@ Time needed: ~20 minutes once you have a domain on Cloudflare.
 
 ---
 
-## 0. Prerequisites
+## 0. Prerequisites — put your domain on Cloudflare first
+
+**Yes, the domain must be connected to Cloudflare before anything else.** The tunnel routes a hostname (`beam.ardhanurfan.my.id`), and a hostname can only exist on a DNS zone that lives in your Cloudflare account. Without an active zone, the Access/Tunnel steps have nothing to attach to.
+
+1. In [dash.cloudflare.com](https://dash.cloudflare.com) → sidebar **Domains** → **Add a domain** (a.k.a. "Onboard a domain"). Enter the bare domain (`ardhanurfan.my.id`), pick the **Free** plan.
+2. Cloudflare shows two **nameservers** (e.g. `xxx.ns.cloudflare.com`). Go to your domain **registrar** (where you bought the domain) and replace its nameservers with those two.
+3. Wait until the zone shows **Active** in the Domains list (minutes to a few hours, depending on the registrar).
+
+Then:
 
 | What | Why |
 | --- | --- |
-| A domain whose DNS is on Cloudflare (example here: `ardhanurfan.my.id`) | The tunnel needs a hostname to route (`beam.ardhanurfan.my.id`) |
 | `cloudflared` installed — `brew install cloudflared` | The tunnel daemon |
-| A (free) Cloudflare Zero Trust team — created automatically the first time you open [one.dash.cloudflare.com](https://one.dash.cloudflare.com) | Hosts the Access policy |
+| A (free) Zero Trust team — sidebar **Zero Trust** (under *Protect & Connect*); first visit asks you to pick a team name and the Free plan | Hosts the Access policy |
 | Beam builds and runs locally (`npm run build && npm start`) | Don't debug two things at once |
+
+> **Finding your way in the redesigned dashboard (2025+)**: the old one.dash.cloudflare.com layout was folded into the main dashboard. Everything Zero Trust (Access applications, Tunnels) now lives under sidebar **Zero Trust** → it opens the Zero Trust area with its own menu: **Access → Applications** for policies, **Networks → Tunnels** for tunnel status.
 
 ## 1. Create the tunnel (one-time)
 
@@ -56,13 +65,15 @@ ingress:
 
 Do this first: the moment the tunnel runs, the hostname is publicly reachable; Access is what makes it yours-only.
 
-In [one.dash.cloudflare.com](https://one.dash.cloudflare.com) → **Access → Applications**:
+In [dash.cloudflare.com](https://dash.cloudflare.com) → sidebar **Zero Trust** (under *Protect & Connect*) → **Access → Applications** (first visit to Zero Trust asks for a team name — pick anything — and the Free plan):
 
 1. **Add an application** → type **Self-hosted**.
 2. **Application domain**: `beam.ardhanurfan.my.id` — leave the path empty so **all paths including `/ws`** are covered.
 3. **Session Duration**: **24 hours** — a short-lived `CF_Authorization` JWT bounds the exploitation window if your phone is lost.
 4. Add a policy → Action **Allow** → Include → **Emails** → your personal email address, nothing else.
-5. **Login methods**: One-time PIN (email OTP) is zero-setup; add Google OAuth if you prefer one-tap login.
+5. **Login methods**: nothing to configure in the app wizard. Since June 2026, new Zero Trust orgs default to the **Cloudflare identity provider** — the login page asks you to sign in with your **Cloudflare account**, and your Allow-by-email policy is checked against that account's email. For a single-user setup this works as-is.
+   - Prefer classic email OTP ("send me a code") instead? Add it under **Zero Trust → Integrations → Identity providers → Add new identity provider → One-time PIN** — the login page then offers both.
+   - Google one-tap login lives in the same place (**Add new identity provider → Google**, needs a Google Cloud OAuth client; optional).
 
 Requests without a valid `CF_Authorization` cookie are rejected at the edge — the laptop never sees them.
 
@@ -73,11 +84,13 @@ Requests without a valid `CF_Authorization` cookie are rejected at the edge — 
 ```bash
 # Terminal 1 — Beam (production build)
 npm run build
-npm start                    # binds 127.0.0.1:2424 — loopback only, by design
+caffeinate -dims npm start   # binds 127.0.0.1:2424 — loopback only, by design
 
 # Terminal 2 — the tunnel
 cloudflared tunnel run beam
 ```
+
+> **Why `caffeinate -dims`**: Beam only lives while the Mac is awake — sleep kills the server, every PTY session, and the tunnel. `caffeinate` (built into macOS) blocks sleep for as long as the wrapped command runs and releases it the moment the server stops: `-d` display sleep, `-i` idle sleep, `-m` disk sleep, `-s` system sleep (effective on AC power). It cannot prevent **lid-close** sleep — keep the lid open with the display off (or use clamshell mode / Amphetamine). More in the README's laptop-sleep section.
 
 **Checkpoint**: on the phone, `https://beam.ardhanurfan.my.id` → Access login (email OTP) → Beam UI with a green status dot. The terminal works end-to-end (type `echo ok`).
 
@@ -122,6 +135,8 @@ Built into the code — a second layer, not a replacement for Access:
 
 | Symptom | Likely cause / fix |
 | --- | --- |
+| Can't find Access/Tunnels in the dashboard | Redesigned nav: sidebar **Zero Trust** → Access → Applications (policies) / Networks → Tunnels (tunnel status) |
+| `tunnel route dns` fails / hostname won't attach | The domain zone isn't **Active** yet — nameservers at the registrar don't point to Cloudflare, or propagation is still in progress (step 0) |
 | `Access login loops / 403 after login` | Policy email doesn't match the address you logged in with — check the Allow policy |
 | Page loads, status dot stays red | Beam isn't running on `:2424`, or `config.yml` points at the wrong port — check `npm start` and `curl 127.0.0.1:2424/api/host` on the laptop |
 | Terminal connects but drops every ~min | Phone locked kills the socket — expected; the session resyncs on reconnect (detach-not-kill) |
