@@ -78,14 +78,16 @@ export async function gitDiff(root: string, file: string): Promise<string> {
   return unstaged || staged;
 }
 
-/** FR-3.2.3 — Commit & Push macro. Returns combined log output. */
+/** FR-3.2.3 — Commit (& optionally Push) macro. Returns combined log output. */
 export async function gitCommitAndPush(
   root: string,
-  message: string
+  message: string,
+  push = true
 ): Promise<{ log: string; pushed: boolean }> {
   let log = "";
   log += await git(root, ["add", "-A"]);
   log += await git(root, ["commit", "-m", message]);
+  if (!push) return { log, pushed: false };
   try {
     log += await git(root, ["push"]);
     return { log, pushed: true };

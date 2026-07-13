@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { sessionHub } from "@/lib/ws-client";
+import Sheet from "@/components/sheet";
 import EditorSheet from "@/components/files/editor-sheet";
 
 interface AgentStatus {
@@ -327,49 +328,44 @@ export default function AgentsView() {
 
       {/* Create dialog */}
       {creating && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-black/60"
-          onClick={() => setCreating(null)}
-        >
-          <div className="sheet bg-canvas" onClick={(e) => e.stopPropagation()}>
-            <p className="eyebrow mb-4">
-              New {creating === "skill" ? "skill" : "subagent"} (global)
-            </p>
-            <div className="sheet-scroll">
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={creating === "skill" ? "my-skill-name" : "my-subagent-name"}
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                className="w-full rounded-xl border border-hairline px-3.5 py-3 font-mono text-[14px] outline-none focus:border-ink"
-              />
-              <p className="mt-2 text-[12px] opacity-60">
-                Created in{" "}
-                <code className="font-mono">
-                  ~/.claude/{creating === "skill" ? "skills/<name>/SKILL.md" : "agents/<name>.md"}
-                </code>
-                , then opens in the editor.
-              </p>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
+        <Sheet
+          title={`New ${creating === "skill" ? "skill" : "subagent"} (global)`}
+          onClose={() => setCreating(null)}
+          footer={
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setCreating(null)}
-                className="rounded-pill border border-hairline px-5 py-2.5 text-[14px] font-medium"
+                className="min-h-11 flex-1 rounded-pill border border-hairline px-4 text-[14px] font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={createSkill}
                 disabled={busy || !newName.trim()}
-                className="rounded-pill bg-primary px-5 py-2.5 text-[14px] font-medium text-on-primary disabled:opacity-40"
+                className="min-h-11 flex-1 rounded-pill bg-primary px-4 text-[14px] font-medium text-on-primary disabled:opacity-40"
               >
                 {busy ? "Creating…" : "Create"}
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={creating === "skill" ? "my-skill-name" : "my-subagent-name"}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full rounded-xl border border-hairline px-3.5 py-3 font-mono text-[14px] outline-none focus:border-ink"
+          />
+          <p className="mt-2 text-[12px] opacity-60">
+            Created in{" "}
+            <code className="font-mono">
+              ~/.claude/{creating === "skill" ? "skills/<name>/SKILL.md" : "agents/<name>.md"}
+            </code>
+            , then opens in the editor.
+          </p>
+        </Sheet>
       )}
 
       {/* Delete confirmation */}

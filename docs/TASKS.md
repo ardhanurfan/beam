@@ -43,6 +43,8 @@
 - [x] M3.5 **FR-3.2.4 (P1)** Quick Stash: `git stash push -u -m "quick-stash-<ts>"`
 - [x] M3.6 Per-file discard (VSCode-style): `/api/git/discard` + confirmation dialog
 - [x] M3.7 `git status -uall`: untracked **directories** are expanded into individual files — a folder row can't be diffed, and discarding one silently deletes the whole folder (this bit us hard; see the 2026-07-12 incident log entry)
+- [x] M3.8 Commit **without** push: the commit sheet offers both "Commit" (local only) and "Commit & Push"; `/api/git/commit` takes `push?: boolean` (default true). Stash/Rollback buttons got text labels
+- [x] M3.9 Shared `<Sheet>` component (`src/components/sheet.tsx`, variants canvas/cream/coral, no close button — scrim tap dismisses) replacing 7 hand-rolled sheets; Stash got a light confirmation sheet; Panic Rollback got a **third gate**: type the repo name to enable the destructive button (incident lesson)
 
 ## M4 — File Explorer & Workspace (FR-3.3.x & FR-3.4.x)
 

@@ -12,6 +12,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { ArrowUp, Folder, Home, Mic, Plus, X } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { sessionHub } from "@/lib/ws-client";
+import Sheet from "@/components/sheet";
 import { useAppStore, useActiveSession } from "@/store/app-store";
 import { useVoiceInput } from "@/lib/use-voice-input";
 
@@ -256,13 +257,8 @@ export default function TerminalView() {
       {/* New-session root picker: a session always opens somewhere the
           user chose — a workspace root or the home directory. */}
       {pickerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-black/60"
-          onClick={() => setPickerOpen(false)}
-        >
-          <div className="sheet bg-canvas" onClick={(e) => e.stopPropagation()}>
-            <p className="eyebrow mb-4">New session in…</p>
-            <ul className="sheet-scroll space-y-2">
+        <Sheet title="New session in…" onClose={() => setPickerOpen(false)}>
+          <ul className="space-y-2">
               {roots.map((r) => (
                 <li key={r.path}>
                   <button
@@ -304,8 +300,7 @@ export default function TerminalView() {
                 </button>
               </li>
             </ul>
-          </div>
-        </div>
+        </Sheet>
       )}
 
       {/* Kill-session confirmation (destructive) */}

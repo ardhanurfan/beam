@@ -13,8 +13,8 @@ import {
   Folder,
   FolderOpen,
   Layers,
-  X,
 } from "lucide-react";
+import Sheet from "@/components/sheet";
 import { useAppStore } from "@/store/app-store";
 import type { WorkspaceRoot } from "@/lib/types";
 
@@ -139,28 +139,14 @@ export default function WorkspacePicker() {
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-black/60"
-          onClick={() => setOpen(false)}
+        <Sheet
+          title="Open folder or workspace"
+          variant="cream"
+          onClose={() => setOpen(false)}
+          bodyClassName="space-y-4"
         >
-          {/* Bottom sheet on block-cream (docs/DESIGN.md color-block usage) */}
-          <div
-            className="sheet bg-block-cream"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="eyebrow">Open folder or workspace</p>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            {error && <p className="mb-2 text-[13px] text-danger">{error}</p>}
-
-            <div className="sheet-scroll space-y-4">
+          <>
+            {error && <p className="text-[13px] text-danger">{error}</p>}
               {/* Discovered .code-workspace files (multi-root) */}
               {discovered.length > 0 && (
                 <section>
@@ -260,10 +246,9 @@ export default function WorkspacePicker() {
                 </section>
               )}
 
-              {loading && !browse && <p className="py-4 text-[14px]">Scanning…</p>}
-            </div>
-          </div>
-        </div>
+            {loading && !browse && <p className="py-4 text-[14px]">Scanning…</p>}
+          </>
+        </Sheet>
       )}
     </>
   );

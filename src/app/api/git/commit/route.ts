@@ -6,7 +6,7 @@ import { WorkspaceAccessError } from "@/lib/server/workspace";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  let body: { root?: string; message?: string };
+  let body: { root?: string; message?: string; push?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "root and message required" }, { status: 400 });
   }
   try {
-    const { log, pushed } = await gitCommitAndPush(body.root, body.message.trim());
+    // push defaults to true (the original macro); push:false commits locally.
+    const { log, pushed } = await gitCommitAndPush(
+      body.root,
+      body.message.trim(),
+      body.push !== false
+    );
     return NextResponse.json({ log, pushed });
   } catch (err) {
     const status = err instanceof WorkspaceAccessError ? 403 : 500;

@@ -17,8 +17,12 @@ import { useAppStore } from "@/store/app-store";
 import type { GitFileStatus } from "@/lib/types";
 import { ROLLBACK_CONFIRM_TOKEN } from "@/lib/constants";
 import StackedDiff from "@/components/git/stacked-diff";
+import Sheet from "@/components/sheet";
 
-const STATUS_BADGE: Record<GitFileStatus["status"], { label: string; cls: string }> = {
+const STATUS_BADGE: Record<
+  GitFileStatus["status"],
+  { label: string; cls: string }
+> = {
   M: { label: "M", cls: "bg-block-lilac" },
   A: { label: "A", cls: "bg-block-mint" },
   D: { label: "D", cls: "bg-block-pink" },
@@ -40,11 +44,19 @@ export default function GitView() {
   const [diff, setDiff] = useState<string | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
-  const [panicStep, setPanicStep] = useState<0 | 1>(0);
+  const [stashOpen, setStashOpen] = useState(false);
+  const [panicStep, setPanicStep] = useState<0 | 1 | 2>(0);
+  const [panicText, setPanicText] = useState("");
   const [discardTarget, setDiscardTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const root = activeRoot ?? roots[0]?.path ?? null;
+  const repoName = root?.split("/").pop() ?? "";
+
+  function closePanic() {
+    setPanicStep(0);
+    setPanicText("");
+  }
 
   // Status fetch re-runs on root change or manual refresh tick.
   const [refreshTick, setRefreshTick] = useState(0);
@@ -81,7 +93,7 @@ export default function GitView() {
     setDiff(null);
     try {
       const r = await fetch(
-        `/api/git/diff?root=${encodeURIComponent(root)}&file=${encodeURIComponent(file)}`
+        `/api/git/diff?root=${encodeURIComponent(root)}&file=${encodeURIComponent(file)}`,
       );
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
@@ -91,19 +103,24 @@ export default function GitView() {
     }
   }
 
-  async function commitAndPush() {
+  async function doCommit(push: boolean) {
     if (!root || !commitMsg.trim()) return;
     setBusy(true);
     try {
       const r = await fetch("/api/git/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ root, message: commitMsg }),
+        body: JSON.stringify({ root, message: commitMsg, push }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      pushActionLog(`✓ commit${d.pushed ? " + push" : " (push failed)"}: ${commitMsg}`);
-      d.log.split("\n").filter(Boolean).forEach((l: string) => pushActionLog(l));
+      pushActionLog(
+        `✓ commit${d.pushed ? " + push" : push ? " (push failed)" : " (local only)"}: ${commitMsg}`,
+      );
+      d.log
+        .split("\n")
+        .filter(Boolean)
+        .forEach((l: string) => pushActionLog(l));
       setCommitOpen(false);
       setCommitMsg("");
       refresh();
@@ -126,6 +143,7 @@ export default function GitView() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       pushActionLog(`✓ stash: ${d.log.trim()}`);
+      setStashOpen(false);
       refresh();
     } catch (err) {
       pushActionLog(`✗ stash failed: ${(err as Error).message}`);
@@ -168,7 +186,7 @@ export default function GitView() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       pushActionLog("✓ panic rollback: working tree reset to HEAD");
-      setPanicStep(0);
+      closePanic();
       setOpenFile(null);
       refresh();
     } catch (err) {
@@ -201,7 +219,9 @@ export default function GitView() {
           >
             <ChevronLeft size={20} />
           </button>
-          <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{openFile}</span>
+          <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+            {openFile}
+          </span>
           <button
             onClick={() => setDiscardTarget(openFile)}
             aria-label="Discard changes in this file"
@@ -302,7 +322,9 @@ export default function GitView() {
         {actionLog.length > 0 && (
           <div className="mx-4 mb-3 max-h-40 overflow-y-auto rounded-xl bg-block-navy p-3 font-mono text-[11px] leading-relaxed text-inverse-ink">
             {actionLog.map((l, i) => (
-              <div key={i} className="whitespace-pre-wrap break-words">{l}</div>
+              <div key={i} className="whitespace-pre-wrap wrap-break-word">
+                {l}
+              </div>
             ))}
           </div>
         )}
@@ -319,7 +341,7 @@ export default function GitView() {
           Commit &amp; Push
         </button>
         <button
-          onClick={quickStash}
+          onClick={() => setStashOpen(true)}
           disabled={files.length === 0 || busy}
           aria-label="Stash changes (recoverable)"
           className="flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-pill border border-hairline px-3.5 text-[12px] font-medium disabled:opacity-40"
@@ -340,35 +362,36 @@ export default function GitView() {
 
       {/* Commit modal (FR-3.2.3) */}
       {commitOpen && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={() => setCommitOpen(false)}>
-          <div className="sheet bg-canvas" onClick={(e) => e.stopPropagation()}>
-            <p className="eyebrow mb-4">Commit &amp; push</p>
-            <div className="sheet-scroll">
-              <textarea
-                value={commitMsg}
-                onChange={(e) => setCommitMsg(e.target.value)}
-                rows={3}
-                placeholder="Commit message"
-                className="w-full rounded-xl border border-hairline px-3.5 py-3 text-[15px] outline-none focus:border-ink"
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
+        <Sheet
+          title="Commit & push"
+          onClose={() => setCommitOpen(false)}
+          footer={
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setCommitOpen(false)}
-                className="rounded-pill border border-hairline px-5 py-2.5 text-[14px] font-medium"
+                onClick={() => doCommit(false)}
+                disabled={busy || !commitMsg.trim()}
+                className="min-h-11 flex-1 rounded-pill border border-hairline px-4 text-[14px] font-medium disabled:opacity-40"
               >
-                Cancel
+                {busy ? "…" : "Commit"}
               </button>
               <button
-                onClick={commitAndPush}
+                onClick={() => doCommit(true)}
                 disabled={busy || !commitMsg.trim()}
-                className="rounded-pill bg-primary px-5 py-2.5 text-[14px] font-medium text-on-primary disabled:opacity-40"
+                className="min-h-11 flex-1 rounded-pill bg-primary px-4 text-[14px] font-medium text-on-primary disabled:opacity-40"
               >
                 {busy ? "Running…" : "Commit & Push"}
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <textarea
+            value={commitMsg}
+            onChange={(e) => setCommitMsg(e.target.value)}
+            rows={3}
+            placeholder="Commit message"
+            className="w-full rounded-xl border border-hairline px-3.5 py-3 text-[15px] outline-none focus:border-ink"
+          />
+        </Sheet>
       )}
 
       {/* Per-file discard confirmation */}
@@ -381,33 +404,108 @@ export default function GitView() {
         />
       )}
 
-      {/* Panic Rollback — explicit two-step confirmation (FR-3.2.5) */}
-      {panicStep === 1 && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={() => setPanicStep(0)}>
-          <div className="sheet bg-block-coral" onClick={(e) => e.stopPropagation()}>
-            <p className="eyebrow mb-4">Panic rollback</p>
-            <p className="sheet-scroll text-[15px] leading-relaxed">
-              This will <strong>discard ALL uncommitted changes</strong>{" "}
-              (<code className="font-mono text-[12px]">git checkout -- . &amp;&amp; git clean -fd</code>),
-              including untracked files. This cannot be undone. Continue?
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
+      {/* Quick Stash — light confirmation (FR-3.2.4, non-destructive) */}
+      {stashOpen && (
+        <Sheet
+          title="Quick stash"
+          onClose={() => setStashOpen(false)}
+          footer={
+            <div className="flex flex-col gap-2">
               <button
-                onClick={() => setPanicStep(0)}
-                className="rounded-pill bg-canvas px-5 py-2.5 text-[14px] font-medium"
+                onClick={quickStash}
+                disabled={busy}
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-primary text-[15px] font-medium text-on-primary disabled:opacity-40"
+              >
+                {busy ? "Stashing…" : "Stash changes"}
+              </button>
+              <button
+                onClick={() => setStashOpen(false)}
+                className="h-12 w-full whitespace-nowrap rounded-pill border border-hairline text-[15px] font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          }
+        >
+          <p className="text-[15px] leading-relaxed">
+            Saves all {files.length} changed file{files.length === 1 ? "" : "s"}{" "}
+            (including untracked) to the git stash and cleans the working
+            tree. Recoverable anytime with{" "}
+            <code className="font-mono text-[12px]">git stash pop</code>.
+          </p>
+        </Sheet>
+      )}
+
+      {/* Panic Rollback — three gates (FR-3.2.5): button → warning sheet →
+          type-to-confirm. The 2026-07-12 incident is why the third exists. */}
+      {panicStep === 1 && (
+        <Sheet
+          title="Panic rollback"
+          variant="coral"
+          onClose={closePanic}
+          footer={
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setPanicStep(2)}
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-danger text-[15px] font-semibold text-white"
+              >
+                Continue
+              </button>
+              <button
+                onClick={closePanic}
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-canvas text-[15px] font-medium"
               >
                 Keep my changes
               </button>
+            </div>
+          }
+        >
+          <p className="text-[15px] leading-relaxed">
+            This will <strong>discard ALL uncommitted changes</strong> (
+            <code className="font-mono text-[12px]">
+              git checkout -- . &amp;&amp; git clean -fd
+            </code>
+            ), including untracked files. This cannot be undone. Continue?
+          </p>
+        </Sheet>
+      )}
+      {panicStep === 2 && (
+        <Sheet
+          title="Type to confirm"
+          variant="coral"
+          onClose={closePanic}
+          footer={
+            <div className="flex flex-col gap-2">
               <button
                 onClick={panicRollback}
-                disabled={busy}
-                className="rounded-pill bg-primary px-5 py-2.5 text-[14px] font-semibold text-on-primary disabled:opacity-40"
+                disabled={busy || panicText !== repoName}
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-danger text-[15px] font-semibold text-white disabled:opacity-40"
               >
-                {busy ? "Rolling back…" : "Yes, discard everything"}
+                {busy ? "Rolling back…" : "Discard everything"}
+              </button>
+              <button
+                onClick={closePanic}
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-canvas text-[15px] font-medium"
+              >
+                Cancel
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <p className="text-[15px] leading-relaxed">
+            Type <strong className="font-mono">{repoName}</strong> to confirm
+            discarding everything in this repository.
+          </p>
+          <input
+            value={panicText}
+            onChange={(e) => setPanicText(e.target.value)}
+            placeholder={repoName}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="mt-3 w-full rounded-xl border border-hairline bg-canvas px-3.5 py-3 font-mono text-[14px] outline-none focus:border-ink"
+          />
+        </Sheet>
       )}
     </div>
   );
@@ -434,7 +532,9 @@ function DiscardDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-[16px] font-semibold">Discard changes?</p>
-        <p className="mt-1 break-all font-mono text-[12px] opacity-70">{path}</p>
+        <p className="mt-1 break-all font-mono text-[12px] opacity-70">
+          {path}
+        </p>
         <p className="mt-2 text-[14px] opacity-70">
           Changes in this file will be reverted to HEAD (untracked files are
           deleted). This cannot be undone.

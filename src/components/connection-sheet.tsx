@@ -4,7 +4,8 @@
 // the state of the PTY sessions, and push-notification opt-in (ROADMAP R1).
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Laptop, Wifi, TerminalSquare, X } from "lucide-react";
+import { Bell, BellOff, Laptop, Wifi, TerminalSquare } from "lucide-react";
+import Sheet from "@/components/sheet";
 import { useAppStore, useActiveSession } from "@/store/app-store";
 import {
   disablePush,
@@ -71,20 +72,8 @@ export default function ConnectionSheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={onClose}>
-      <div className="sheet bg-canvas" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <p className="eyebrow">Connection</p>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-soft"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="sheet-scroll space-y-3">
+    <Sheet title="Connection" onClose={onClose} bodyClassName="space-y-3">
+      <>
           {/* Bridge status */}
           <div className="flex items-center gap-3 rounded-2xl bg-surface-soft p-4">
             <span
@@ -194,8 +183,7 @@ export default function ConnectionSheet({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+      </>
+    </Sheet>
   );
 }

@@ -1,12 +1,12 @@
 # Beam — Design System
 
-> Adapted from the original reference document (a study of Figma's marketing design language) into the working design system of the Beam mobile app. The DNA carries over — monochrome core, pastel color blocks, pill CTAs, mono-as-taxonomy — re-grounded in Beam's actual screens and tokens (`src/app/globals.css` `@theme`).
+> The DNA carries over — monochrome core, pastel color blocks, pill CTAs, mono-as-taxonomy — re-grounded in Beam's actual screens and tokens (`src/app/globals.css` `@theme`).
 
 ## Overview
 
 Beam is, at the system level, a tool-clean black-and-white frame. The chrome — header, bottom nav, body type, buttons — is monochrome. Body copy is Inter, small mono `.eyebrow` labels (JetBrains Mono, all-caps, positive tracking) act as section markers, and every primary CTA is a pill: the same black `bg-primary text-on-primary` pill everywhere.
 
-What makes the design distinctive is what happens **between** those monochrome bookends: the UI drops into pastel **color blocks** — lime, lilac, cream, mint, pink, coral, and a deep navy — that carry state and grouping. They aren't accents tucked into a card; a sheet, a banner, or the entire terminal takes the surface. The terminal tab is the navy block at full-viewport scale; the workspace picker is a cream sheet; the panic-rollback confirmation is a coral sheet — the color *is* the message.
+What makes the design distinctive is what happens **between** those monochrome bookends: the UI drops into pastel **color blocks** — lime, lilac, cream, mint, pink, coral, and a deep navy — that carry state and grouping. They aren't accents tucked into a card; a sheet, a banner, or the entire terminal takes the surface. The terminal tab is the navy block at full-viewport scale; the workspace picker is a cream sheet; the panic-rollback confirmation is a coral sheet — the color _is_ the message.
 
 This is a system built on contrast: the monochrome chrome makes the color blocks feel intentional rather than decorative, and the color blocks make the monochrome chrome feel like a calm instrument panel rather than enterprise SaaS. The interface never reaches for shadows or gradients to do the work that color blocks and confident typography already do.
 
@@ -62,15 +62,15 @@ This is a system built on contrast: the monochrome chrome makes the color blocks
 
 ### Hierarchy
 
-| Role | Size | Weight | Tracking | Use |
-| --- | --- | --- | --- | --- |
-| App title | 17px | 600 | −0.3px | "Beam" in the header |
-| Section/card title | 14–16px | 600 | −0.14px | Card headings, dialog titles |
-| Body | 14–15px | 400 | −0.14px | Prose, descriptions, buttons |
-| Small body | 12–13px | 400 | −0.14px | Hints, secondary rows |
-| `.eyebrow` | 12px | 400 | +0.6px | Mono uppercase section labels ("CONNECTION", "AGENTS") |
-| Mono meta | 11–12px | 400 | 0 | Paths, session ids, versions, log lines |
-| Terminal | 12px / 1.25 | 400 | 0 | xterm.js |
+| Role               | Size        | Weight | Tracking | Use                                                    |
+| ------------------ | ----------- | ------ | -------- | ------------------------------------------------------ |
+| App title          | 17px        | 600    | −0.3px   | "Beam" in the header                                   |
+| Section/card title | 14–16px     | 600    | −0.14px  | Card headings, dialog titles                           |
+| Body               | 14–15px     | 400    | −0.14px  | Prose, descriptions, buttons                           |
+| Small body         | 12–13px     | 400    | −0.14px  | Hints, secondary rows                                  |
+| `.eyebrow`         | 12px        | 400    | +0.6px   | Mono uppercase section labels ("CONNECTION", "AGENTS") |
+| Mono meta          | 11–12px     | 400    | 0        | Paths, session ids, versions, log lines                |
+| Terminal           | 12px / 1.25 | 400    | 0        | xterm.js                                               |
 
 ### Principles
 
@@ -95,25 +95,25 @@ Canvas whitespace makes the color blocks feel deliberate: a pastel surface never
 
 ## Elevation & Depth
 
-| Level | Treatment | Use |
-| --- | --- | --- |
-| 0 (flat) | No shadow, no border | Color blocks, terminal, header |
-| 1 (hairline) | 1px `hairline` border on `canvas` | Cards, list rows, inputs |
-| 2 (soft) | `surface-soft` fill | Icon buttons, inactive chips |
-| 3 (overlay) | `black/60` scrim + sheet/dialog | Sheets, confirmations |
+| Level        | Treatment                         | Use                            |
+| ------------ | --------------------------------- | ------------------------------ |
+| 0 (flat)     | No shadow, no border              | Color blocks, terminal, header |
+| 1 (hairline) | 1px `hairline` border on `canvas` | Cards, list rows, inputs       |
+| 2 (soft)     | `surface-soft` fill               | Icon buttons, inactive chips   |
+| 3 (overlay)  | `black/60` scrim + sheet/dialog   | Sheets, confirmations          |
 
 Beam is shadow-free by design — the color blocks substitute for elevation. Separation comes from hairlines, soft fills, and surface changes.
 
 ## Shapes
 
-| Shape | Radius | Use |
-| --- | --- | --- |
-| `rounded-pill` | 999px | Text CTAs, chips, tabs, toggles |
-| `rounded-full` | 9999px | Icon buttons, status dots |
-| `rounded-xl` / `rounded-2xl` | 12/16px | Cards, list rows, inputs |
-| `rounded-[20px]`–`[24px]` | 20–24px | Dialogs, sheets (top corners), empty-state blocks |
-| Logo tile | 116/512 | App icon squircle |
-| Prompt bar | 22px | The chat-style input capsule |
+| Shape                        | Radius  | Use                                               |
+| ---------------------------- | ------- | ------------------------------------------------- |
+| `rounded-pill`               | 999px   | Text CTAs, chips, tabs, toggles                   |
+| `rounded-full`               | 9999px  | Icon buttons, status dots                         |
+| `rounded-xl` / `rounded-2xl` | 12/16px | Cards, list rows, inputs                          |
+| `rounded-[20px]`–`[24px]`    | 20–24px | Dialogs, sheets (top corners), empty-state blocks |
+| Logo tile                    | 116/512 | App icon squircle                                 |
+| Prompt bar                   | 22px    | The chat-style input capsule                      |
 
 ## Components
 
@@ -133,7 +133,7 @@ Beam is shadow-free by design — the color blocks substitute for elevation. Sep
 
 ### Sheets (signature)
 
-The bottom sheet is Beam's color-block section. Shared frame `.sheet` (+ `.sheet-scroll` for the long region): 24px top corners, `max-height: 80dvh`, safe-area padding, scrim `black/60`, tap-to-dismiss.
+The bottom sheet is Beam's color-block section. One component — `src/components/sheet.tsx` (`<Sheet title variant onClose footer>`) — owns the frame: 24px top corners, `max-height: 80dvh`, safe-area padding, scrim `black/60`. **No close button by design**: tapping the scrim dismisses, uniformly. Body scrolls (`.sheet-scroll`); the footer (action buttons) stays pinned.
 
 - **`sheet-canvas`** — default: connection sheet, commit sheet, new-session picker, create-skill dialog.
 - **`sheet-cream`** — workspace picker (`bg-block-cream`).

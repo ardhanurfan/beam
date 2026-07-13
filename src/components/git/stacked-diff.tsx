@@ -48,13 +48,20 @@ export default function StackedDiff({ diff }: { diff: string }) {
   const hunks = useMemo(() => stackHunks(diff), [diff]);
 
   if (hunks.length === 0) {
-    return <p className="px-4 py-6 text-center text-[14px]">No changes in this file.</p>;
+    return (
+      <p className="px-4 py-6 text-center text-[14px]">
+        No changes in this file.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
       {hunks.map((lines, h) => (
-        <div key={h} className="overflow-hidden rounded-md border border-hairline">
+        <div
+          key={h}
+          className="overflow-hidden rounded-md border border-hairline"
+        >
           {lines.map((l, i) =>
             l.kind === "hunk-header" ? (
               <div key={i} className="eyebrow bg-surface-soft px-3 py-1.5">
@@ -63,12 +70,12 @@ export default function StackedDiff({ diff }: { diff: string }) {
             ) : (
               <div
                 key={i}
-                className={`whitespace-pre-wrap break-words px-3 ${
+                className={`whitespace-pre-wrap wrap-break-word px-3 ${
                   l.kind === "removed"
                     ? "bg-block-pink"
                     : l.kind === "added"
-                    ? "bg-block-mint"
-                    : "bg-canvas"
+                      ? "bg-block-mint"
+                      : "bg-canvas"
                 }`}
               >
                 <span className="mr-2 select-none opacity-50">
@@ -76,7 +83,7 @@ export default function StackedDiff({ diff }: { diff: string }) {
                 </span>
                 {l.text || " "}
               </div>
-            )
+            ),
           )}
         </div>
       ))}
