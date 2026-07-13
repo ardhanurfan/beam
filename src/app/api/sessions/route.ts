@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     label?: string;
     cols?: number;
     rows?: number;
+    initialInput?: string;
   };
   try {
     body = await req.json();
@@ -50,6 +51,8 @@ export async function POST(req: Request) {
       label: typeof body.label === "string" ? body.label : undefined,
       cols: typeof body.cols === "number" ? body.cols : undefined,
       rows: typeof body.rows === "number" ? body.rows : undefined,
+      initialInput:
+        typeof body.initialInput === "string" ? body.initialInput : undefined,
     });
     const info: SessionInfo = {
       id: s.id,

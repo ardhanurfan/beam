@@ -10,7 +10,7 @@ export type ConnectionStatus =
   | "resyncing"
   | "disconnected";
 
-export type Tab = "terminal" | "git" | "files" | "agents";
+export type Tab = "terminal" | "git" | "files" | "tasks" | "agents";
 
 /** One live PTY session on the laptop (ROADMAP R2). */
 export interface SessionMeta {

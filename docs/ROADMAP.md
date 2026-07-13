@@ -145,6 +145,38 @@ Commit & Push currently does `git add -A` — all or nothing. The stacked-diff v
 
 ---
 
+## R8 — Jira tasks & agent task automation
+
+**Status**: `[~]` Phase 1 shipped 2026-07-14 (see TASKS.md M8.6–M8.7) · **Priority**: P1 · **Effort**: Large (phased)
+
+Beam knows how to run agents; the work queue lives in Jira (or in your head). Bridging them turns "read the ticket on the phone, retype it to Claude" into one tap — and later into scheduled, unattended runs with push-based approval.
+
+**Phase 1 — Tasks tab (shipped)**
+
+- Jira subtab, env-gated (`JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN`); the token stays on the laptop, every request proxied server-side. Assigned issues + full detail; descriptions converted ADF→markdown (links, code, mentions) by `src/lib/server/jira.ts`.
+- My Tasks subtab: custom markdown task files in `~/.beam/tasks` (path-guarded CRUD).
+- Unified run flow: editable auto-composed prompt → installed agent → **required** directory → optional skills/subagents → new PTY session; the server types the prompt into the agent's TUI once boot output goes quiet (`initialInput`, bracketed paste for multi-line).
+- Deliberately deferred: per-task auto-branching and Jira status transitions (fold into Phase 2).
+
+**Phase 2 — Queue runner (idea)**
+
+- Sequential per-repo task queue on the server: `queued → branch created → agent running → waiting-approval → done/failed`; one task at a time per repo protects the working tree.
+- Reuses `ActivityMonitor` + Web Push: "agent is waiting for approval" lands on the phone; approve from the terminal.
+- Auto-branch per task (`feature/<KEY>` via the existing `/api/git/checkout`) and optional Jira transition to In Progress / In Review.
+
+**Phase 3 — Triggers (idea)**
+
+- Cron on the server (laptop must be awake — `caffeinate`, see README sleep settings) and/or a Jira webhook through the existing tunnel (secret-gated endpoint).
+- Permission posture per rule: default **semi-auto** (TUI asks, push notifies); full-auto (`--permission-mode` / `--allowedTools`) strictly opt-in per rule — branch isolation before any run (2026-07-12 incident is the cautionary tale).
+
+**Acceptance criteria (Phase 2+)**
+
+- A queued task runs unattended until the agent needs approval; the phone gets a push and the terminal shows the pending prompt.
+- Two tasks against the same repo never run concurrently.
+- Laptop asleep = queue paused, never lost.
+
+---
+
 ## Rejected / parked
 
 - **Chat-bubble parsing of Claude Code TUI** — attempted, replaced by the real xterm.js terminal (see TASKS.md M2.1). Don't revisit unless Claude Code ships a machine-readable output mode. The parser's idle-timer/prompt-regex core was repurposed into `server/activity-monitor.ts` as the R1 notification trigger; the `chat_message` protocol frames and chat transcript machinery were removed as dead code (2026-07-12).

@@ -65,6 +65,9 @@ class PtySessionManager {
       label?: string;
       cols?: number;
       rows?: number;
+      /** Text typed into the PTY once the program has finished booting
+       *  (task prompts for agent TUIs). Submitted with a trailing CR. */
+      initialInput?: string;
     } = {}
   ): PtySession {
     // Without an explicit cwd, open in the active workspace (first root)
@@ -140,7 +143,48 @@ class PtySessionManager {
     });
 
     this.sessions.set(id, session);
+    if (opts.initialInput?.trim()) {
+      this.scheduleInitialInput(session, opts.initialInput.trim());
+    }
     return session;
+  }
+
+  /**
+   * Type `text` into the PTY once its program is ready: agent TUIs print a
+   * boot banner first, so wait for the output stream to go quiet briefly
+   * (or a hard cap) before writing. Multi-line text goes in as a bracketed
+   * paste so TUIs treat it as ONE prompt instead of submitting per line.
+   */
+  private scheduleInitialInput(session: PtySession, text: string): void {
+    const QUIET_MS = 1_500; // no output this long => boot banner is done
+    const MAX_WAIT_MS = 10_000; // spinner-heavy TUIs never go fully quiet
+    let done = false;
+    let quietTimer: NodeJS.Timeout | null = null;
+
+    const write = () => {
+      if (done) return;
+      done = true;
+      if (quietTimer) clearTimeout(quietTimer);
+      clearTimeout(maxTimer);
+      dataSub.dispose();
+      const payload = text.includes("\n")
+        ? `\x1b[200~${text}\x1b[201~\r`
+        : `${text}\r`;
+      try {
+        session.pty.write(payload);
+      } catch {
+        /* pty already exited */
+      }
+    };
+
+    quietTimer = setTimeout(write, QUIET_MS); // program printed nothing at all
+    const dataSub = session.pty.onData(() => {
+      if (done) return;
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(write, QUIET_MS);
+    });
+    const maxTimer = setTimeout(write, MAX_WAIT_MS);
+    maxTimer.unref?.();
   }
 
   get(id: string): PtySession | undefined {

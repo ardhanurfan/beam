@@ -272,6 +272,8 @@ class SessionHub {
     cwd?: string;
     command?: string;
     label?: string;
+    /** Typed into the PTY (and submitted) once the program has booted. */
+    initialInput?: string;
   } = {}): Promise<string | null> {
     try {
       // Spawn at this device's terminal size so TUIs draw correctly from

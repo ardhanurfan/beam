@@ -3,13 +3,14 @@
 // Bottom tab bar — classic mobile app style: icon with a small label
 // underneath, active tab in ink, inactive tabs muted.
 
-import { Terminal, GitBranch, FolderOpen, Bot } from "lucide-react";
+import { Terminal, GitBranch, FolderOpen, ListTodo, Bot } from "lucide-react";
 import { useAppStore, type Tab } from "@/store/app-store";
 
 const TABS: Array<{ id: Tab; label: string; Icon: typeof Terminal }> = [
   { id: "terminal", label: "Terminal", Icon: Terminal },
   { id: "git", label: "Source", Icon: GitBranch },
   { id: "files", label: "Files", Icon: FolderOpen },
+  { id: "tasks", label: "Tasks", Icon: ListTodo },
   { id: "agents", label: "Agents", Icon: Bot },
 ];
 

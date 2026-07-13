@@ -15,6 +15,7 @@ import BottomNav from "@/components/bottom-nav";
 import TerminalView from "@/components/terminal/terminal-view";
 import GitView from "@/components/git/git-view";
 import FilesView from "@/components/files/files-view";
+import TasksView from "@/components/tasks/tasks-view";
 import AgentsView from "@/components/agents/agents-view";
 
 export default function AppShell() {
@@ -98,6 +99,9 @@ export default function AppShell() {
         </div>
         <div className={tab === "files" ? "h-full" : "hidden"}>
           <FilesView />
+        </div>
+        <div className={tab === "tasks" ? "h-full" : "hidden"}>
+          <TasksView />
         </div>
         <div className={tab === "agents" ? "h-full" : "hidden"}>
           <AgentsView />

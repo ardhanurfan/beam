@@ -10,13 +10,14 @@ Docs live in [`docs/`](./docs/README.md) — product spec: [PRD.md](./docs/PRD.m
 
 ## Features
 
-- **A real terminal on your phone** — xterm.js renders Claude Code's TUI exactly as it appears on the laptop (colors, spinners, box drawing), with touch scrolling, a chat-style prompt bar, voice-to-text, and shortcut keys (`Esc · Tab · ⇧Tab · Ctrl C/D/R · arrows · Enter`) that mobile keyboards lack.
+- **A real terminal on your phone** — xterm.js renders Claude Code's TUI exactly as it appears on the laptop (colors, spinners, box drawing). Touch is read-and-scroll only (scrolling never summons the keyboard), font size is adjustable (`A− / A+` — the PTY resizes so the TUI reflows instead of clipping), a jump-to-latest button appears while reading scrollback, and input goes through a chat-style prompt bar, voice-to-text, and shortcut keys (`Esc · Tab · ⇧Tab · Ctrl C/D/R · arrows · Enter`) that mobile keyboards lack.
 - **Multiple sessions, tabs like a real terminal** — run Claude Code and a plain shell (or several agents) side by side; the server is the source of truth, so reopening the app reattaches to every live session, even ones another device started.
 - **Push notifications when the agent needs you** — if nobody is watching a session and its output goes quiet, your phone gets a push: "waiting for your input" or "task likely finished". Opt in from the connection sheet.
-- **Mobile source control** — per-repo status list, stacked diffs (removed above, added below), per-file discard like VSCode, Commit & Push, Quick Stash, and a two-step Panic Rollback.
+- **Mobile source control** — per-repo status list, stacked diffs (removed above, added below), per-file discard like VSCode, Commit & Push, Quick Stash, a two-step Panic Rollback, and branch awareness: a chip shows the current branch with ahead/behind counts, and a sheet switches to or creates branches (plain non-forced checkout — git refuses rather than clobbers, with a "Stash first" shortcut when the tree is dirty).
 - **File explorer + editor** — open any folder or a multi-root `.code-workspace` (VSCode), lazy-loaded tree, CodeMirror 6 mini-editor with undo/redo, explicit save, and an unsaved-changes prompt.
 - **Sessions that survive disconnects** — the PTY keeps running when the phone drops (detach, not kill); a 256 KB ring buffer plus sequence-number resync replays missed output; 15-second heartbeat; dormant sessions are reaped after 12 hours.
-- **Agents & skills management** — detects the coding agents installed on the laptop (Claude Code, Codex, Gemini, Aider, …), launches any of them into its own terminal session with one tap, and manages their skills/subagents/prompts (list, create from template, edit, delete) from the phone.
+- **Tasks: Jira + your own** — a Tasks tab with two subtabs. **Jira** (appears only when the `JIRA_*` env vars are set; the token never leaves the laptop) lists issues assigned to you and shows the full detail — status, epic, labels, priority, and the complete description with clickable links and code blocks, converted server-side from ADF to markdown. **My Tasks** are plain markdown files in `~/.beam/tasks` (create, edit, delete in-app). Either kind runs with one tap: review the auto-composed prompt (editable), pick an installed agent and a working directory (required), optionally attach skills/subagents, and Beam starts a terminal session and types the prompt into the agent's TUI once it finishes booting.
+- **Agents & skills management** — detects the coding agents installed on the laptop (Claude Code, Codex, Gemini, Aider, …), launches any of them into its own terminal session with one tap, and manages their skills/subagents/prompts (list, create from template, edit, delete) from the phone. Skills shipped by enabled Claude Code plugins are viewable read-only.
 - **PWA** — full manifest + service worker; "Add to Home Screen" turns it into a standalone app.
 
 ## Running
@@ -49,6 +50,9 @@ cp .env.example .env
 | `MMC_SHELL` | `$SHELL` | Shell/binary spawned per PTY session |
 | `MMC_IDLE_HOURS` | `12` | Max age of a dormant session before termination |
 | `MMC_PUSH_SUBJECT` | `mailto:beam@example.com` | VAPID contact identity sent to the browser push service — set your own address |
+| `JIRA_BASE_URL` | — | Jira Cloud instance, e.g. `https://yourcompany.atlassian.net`. The Jira subtab in Tasks appears only when all three `JIRA_*` vars are set |
+| `JIRA_EMAIL` | — | Atlassian account email for the API token |
+| `JIRA_API_TOKEN` | — | API token (id.atlassian.com → Security → API tokens). Stays on the laptop; requests are proxied server-side |
 
 ## Recommended laptop sleep settings
 
@@ -91,8 +95,8 @@ Phone (PWA) ──wss──> Cloudflare Access ──> Cloudflare Tunnel ──>
 | Part | Contents |
 |---|---|
 | `server/` | Custom Node server: PTY session manager (ring buffer, detach-not-kill, resync), WebSocket envelope protocol, activity monitor (push triggers), Web Push (VAPID keys + subscriptions in `~/.beam/push.json`) |
-| `src/app/api/` | `git/*` (status, diff, commit, stash, discard, rollback) · `fs/*` (tree, read, write) · `workspace/*` (list, parse, browse, open, active) · `sessions` + `sessions/kill` (PTY session registry) · `push` (notification subscriptions) · `agents` + `skills/*` (detect agents, manage skills) · `host` (laptop & network info) |
-| `src/components/` | terminal (xterm), git, files/editor, workspace picker, connection sheet |
+| `src/app/api/` | `git/*` (status, diff, commit, stash, discard, rollback, branches, checkout) · `fs/*` (tree, read, write) · `workspace/*` (list, parse, browse, open, active) · `sessions` + `sessions/kill` (PTY session registry) · `push` (notification subscriptions) · `agents` + `skills/*` (detect agents, manage skills) · `jira/*` (assigned issues + detail, ADF→markdown, env-gated) · `tasks/*` (custom markdown tasks in `~/.beam/tasks`) · `host` (laptop & network info) |
+| `src/components/` | terminal (xterm), git, files/editor, tasks (Jira + custom + run-task flow), workspace picker, connection sheet |
 | `src/app/globals.css` | Design tokens from docs/DESIGN.md (Tailwind 4 `@theme`) |
 
 Layered security: identity gate at the edge (Cloudflare Access), git runs through fixed-argv `execFile` (no shell injection), every fs/git endpoint is confined to the active workspace roots, and destructive actions require explicit confirmation (server-side tokens).
