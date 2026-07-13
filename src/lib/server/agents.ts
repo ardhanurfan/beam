@@ -123,6 +123,8 @@ export interface SkillItem {
   name: string;
   path: string;
   description: string | null;
+  /** Plugin-shipped files are managed by the marketplace: viewable, not editable. */
+  readonly?: boolean;
 }
 
 function parseFrontmatter(content: string): Record<string, string> {
@@ -211,12 +213,12 @@ export async function listSkills(agentId: string): Promise<SkillItem[]> {
 }
 
 /**
- * Skills shipped by ENABLED Claude Code plugins. The marketplaces dir is a
+ * Skill dirs of ENABLED Claude Code plugins. The marketplaces dir is a
  * catalog cache of every available plugin, so we only surface plugins the
  * user actually enabled in settings.json (`enabledPlugins`).
  */
-async function listClaudePluginSkills(): Promise<SkillItem[]> {
-  const items: SkillItem[] = [];
+async function enabledPluginSkillDirs(): Promise<Array<{ plugin: string; dir: string }>> {
+  const dirs: Array<{ plugin: string; dir: string }> = [];
   let enabled: Record<string, boolean> = {};
   try {
     const settings = JSON.parse(
@@ -224,24 +226,40 @@ async function listClaudePluginSkills(): Promise<SkillItem[]> {
     );
     enabled = settings.enabledPlugins ?? {};
   } catch {
-    return items;
+    return dirs;
   }
   for (const [key, on] of Object.entries(enabled)) {
     if (!on) continue;
     const [plugin, marketplace] = key.split("@");
     if (!plugin || !marketplace) continue;
     for (const sub of ["plugins", "external_plugins"]) {
-      const skillsDir = path.join(
-        HOME, ".claude", "plugins", "marketplaces", marketplace, sub, plugin, "skills"
-      );
-      const source: SkillSource = {
-        label: `Plugin: ${plugin}`,
-        dir: skillsDir,
-        kind: "skill-dir",
-        type: "skill",
-      };
-      items.push(...(await listSource("claude", source, skillsDir, "global")));
+      dirs.push({
+        plugin,
+        dir: path.join(
+          HOME, ".claude", "plugins", "marketplaces", marketplace, sub, plugin, "skills"
+        ),
+      });
     }
+  }
+  return dirs;
+}
+
+/** Skills shipped by enabled Claude Code plugins — listed read-only. */
+async function listClaudePluginSkills(): Promise<SkillItem[]> {
+  const items: SkillItem[] = [];
+  for (const { plugin, dir } of await enabledPluginSkillDirs()) {
+    const source: SkillSource = {
+      label: `Plugin: ${plugin}`,
+      dir,
+      kind: "skill-dir",
+      type: "skill",
+    };
+    items.push(
+      ...(await listSource("claude", source, dir, "global")).map((i) => ({
+        ...i,
+        readonly: true as const,
+      }))
+    );
   }
   return items;
 }
@@ -250,8 +268,12 @@ async function listClaudePluginSkills(): Promise<SkillItem[]> {
 
 export class SkillAccessError extends Error {}
 
-/** Every dir a skill file may legally live under, given the active roots. */
-function allowedSkillDirs(): string[] {
+/**
+ * Every dir a skill file may legally live under, given the active roots.
+ * Plugin skill dirs are read-only (marketplace-managed), so they only count
+ * for mode "read" — write/delete stays confined to user-owned dirs.
+ */
+async function allowedSkillDirs(mode: "read" | "write"): Promise<string[]> {
   const dirs: string[] = [];
   const roots = getActiveWorkspace().roots;
   for (const agent of AGENTS) {
@@ -263,16 +285,22 @@ function allowedSkillDirs(): string[] {
       }
     }
   }
+  if (mode === "read") {
+    dirs.push(...(await enabledPluginSkillDirs()).map((p) => p.dir));
+  }
   return dirs;
 }
 
-export function assertSkillPath(requested: string): string {
+export async function assertSkillPath(
+  requested: string,
+  mode: "read" | "write" = "write"
+): Promise<string> {
   // Clients don't know the server's home dir — accept "~/" paths.
   const expanded = requested.startsWith("~/")
     ? path.join(HOME, requested.slice(2))
     : requested;
   const resolved = path.resolve(expanded);
-  const ok = allowedSkillDirs().some(
+  const ok = (await allowedSkillDirs(mode)).some(
     (d) => resolved === d || resolved.startsWith(d + path.sep)
   );
   if (!ok) {
@@ -286,7 +314,7 @@ export function assertSkillPath(requested: string): string {
  * whole skill directory is removed; otherwise just the file.
  */
 export async function deleteSkill(requested: string): Promise<string> {
-  const file = assertSkillPath(requested);
+  const file = await assertSkillPath(requested, "write");
   const dir = path.dirname(file);
   const parentName = path.basename(path.dirname(dir));
   if (path.basename(file) === "SKILL.md" && parentName === "skills") {

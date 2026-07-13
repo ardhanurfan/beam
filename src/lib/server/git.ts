@@ -59,6 +59,60 @@ export async function gitStatus(root: string): Promise<GitFileStatus[]> {
   return files;
 }
 
+export interface GitBranchInfo {
+  /** Current branch name, or null when HEAD is detached. */
+  current: string | null;
+  branches: string[];
+  /** Commits ahead/behind upstream; both 0 when there is no upstream. */
+  ahead: number;
+  behind: number;
+}
+
+/** Current branch + local branch list + ahead/behind vs upstream. */
+export async function gitBranchInfo(root: string): Promise<GitBranchInfo> {
+  const head = (await git(root, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+  const current = head === "HEAD" ? null : head; // "HEAD" = detached
+  const branches = (await git(root, ["branch", "--format=%(refname:short)"]))
+    .split("\n")
+    .map((b) => b.trim())
+    // Detached HEAD shows up as a pseudo-entry "(HEAD detached at …)".
+    .filter((b) => b && !b.startsWith("("));
+  let ahead = 0;
+  let behind = 0;
+  try {
+    const counts = await git(root, [
+      "rev-list", "--left-right", "--count", "@{upstream}...HEAD",
+    ]);
+    const [left, right] = counts.trim().split(/\s+/).map(Number);
+    behind = left || 0;
+    ahead = right || 0;
+  } catch {
+    /* no upstream configured */
+  }
+  return { current, branches, ahead, behind };
+}
+
+/**
+ * Switch to (or create) a branch. Plain `git checkout` is non-destructive:
+ * it refuses when local changes would be clobbered — never forced here.
+ */
+export async function gitCheckout(
+  root: string,
+  branch: string,
+  create = false
+): Promise<string> {
+  // A leading "-" would be parsed as a checkout option, not a branch name.
+  if (!branch || branch.startsWith("-")) {
+    throw new Error(`Invalid branch name: ${branch}`);
+  }
+  await git(root, ["check-ref-format", "--branch", branch]);
+  const out = await git(
+    root,
+    create ? ["checkout", "-b", branch] : ["checkout", branch]
+  );
+  return out || `Switched to ${branch}`;
+}
+
 /** FR-3.2.2 — unified diff for one file (untracked files diffed against /dev/null). */
 export async function gitDiff(root: string, file: string): Promise<string> {
   const tracked = await git(root, ["ls-files", "--", file]);

@@ -6,6 +6,7 @@
 // VirtualKeyboard API when available, with a visualViewport.resize fallback.
 
 import { useEffect, useState } from "react";
+import TapButton from "@/components/tap-button";
 
 export interface ToolbarKey {
   label: string;
@@ -107,18 +108,13 @@ export default function FloatingToolbar({
       style={{ bottom: offset }}
     >
       {keys.map((k) => (
-        <button
+        <TapButton
           key={k.label}
-          // preventDefault on pointerdown keeps focus (and the keyboard) on
-          // the input/editor — critical for a toolbar above the keyboard.
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onKey(k.value);
-          }}
+          onTap={() => onKey(k.value)}
           className="min-h-9 shrink-0 rounded-sm border border-hairline bg-canvas px-3 font-mono text-[13px]"
         >
           {k.label}
-        </button>
+        </TapButton>
       ))}
     </div>
   );

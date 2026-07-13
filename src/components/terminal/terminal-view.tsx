@@ -13,6 +13,7 @@ import { ArrowUp, Folder, Home, Mic, Plus, X } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import { sessionHub } from "@/lib/ws-client";
 import Sheet from "@/components/sheet";
+import TapButton from "@/components/tap-button";
 import { useAppStore, useActiveSession } from "@/store/app-store";
 import { useVoiceInput } from "@/lib/use-voice-input";
 
@@ -191,16 +192,13 @@ export default function TerminalView() {
       {/* Shortcut keys */}
       <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto px-3 py-2">
         {KEYS.map((k) => (
-          <button
+          <TapButton
             key={k.label}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              sessionHub.active()?.sendRaw(k.seq);
-            }}
+            onTap={() => sessionHub.active()?.sendRaw(k.seq)}
             className="h-8 shrink-0 rounded-md bg-white/10 px-3 font-mono text-[12px] font-medium text-white/90 active:bg-white/25"
           >
             {k.label}
-          </button>
+          </TapButton>
         ))}
       </div>
 

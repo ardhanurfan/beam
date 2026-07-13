@@ -36,6 +36,7 @@ interface SkillItem {
   name: string;
   path: string;
   description: string | null;
+  readonly?: boolean;
 }
 
 const TYPE_BADGE: Record<SkillItem["type"], string> = {
@@ -72,7 +73,11 @@ export default function AgentsView() {
   const [selected, setSelected] = useState<string>("claude");
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [editor, setEditor] = useState<{ path: string; content: string } | null>(null);
+  const [editor, setEditor] = useState<{
+    path: string;
+    content: string;
+    readonly?: boolean;
+  } | null>(null);
   const [creating, setCreating] = useState<null | "skill" | "subagent">(null);
   const [newName, setNewName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<SkillItem | null>(null);
@@ -124,7 +129,7 @@ export default function AgentsView() {
       const r = await fetch(`/api/skills/read?path=${encodeURIComponent(item.path)}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      setEditor({ path: item.path, content: d.content });
+      setEditor({ path: item.path, content: d.content, readonly: item.readonly });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -251,7 +256,11 @@ export default function AgentsView() {
           ))}
         </div>
 
-        {error && <p className="mb-2 rounded-md bg-block-pink px-3 py-2 text-[13px]">{error}</p>}
+        {error && (
+          <p className="wrap-anywhere mb-2 min-w-0 rounded-md bg-block-pink px-3 py-2 text-[13px]">
+            {error}
+          </p>
+        )}
 
         {selected === "claude" && (
           <div className="mb-3 flex gap-2">
@@ -301,13 +310,16 @@ export default function AgentsView() {
                 </span>
                 <ChevronRight size={16} className="shrink-0 opacity-30" />
               </button>
-              <button
-                onClick={() => setDeleteTarget(s)}
-                aria-label={`Delete ${s.name}`}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-danger/70 active:bg-surface-soft"
-              >
-                <Trash2 size={16} />
-              </button>
+              {/* Plugin-shipped skills are marketplace-managed: no delete. */}
+              {!s.readonly && (
+                <button
+                  onClick={() => setDeleteTarget(s)}
+                  aria-label={`Delete ${s.name}`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-danger/70 active:bg-surface-soft"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -319,6 +331,7 @@ export default function AgentsView() {
           path={editor.path}
           initialContent={editor.content}
           writeApi="/api/skills/write"
+          readOnly={editor.readonly}
           onClose={() => {
             setEditor(null);
             refresh();

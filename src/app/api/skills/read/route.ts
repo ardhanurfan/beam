@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const requested = req.nextUrl.searchParams.get("path");
   if (!requested) return NextResponse.json({ error: "path required" }, { status: 400 });
   try {
-    const file = assertSkillPath(requested);
+    const file = await assertSkillPath(requested, "read");
     const content = await fs.readFile(file, "utf8").catch(() => null);
     return NextResponse.json({ content: content ?? "", exists: content !== null });
   } catch (err) {

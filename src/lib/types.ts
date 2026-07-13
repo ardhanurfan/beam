@@ -19,3 +19,12 @@ export interface GitFileStatus {
   status: "M" | "A" | "D" | "R" | "U" | "C";
   staged: boolean;
 }
+
+export interface GitBranchInfo {
+  /** Current branch name, or null when HEAD is detached. */
+  current: string | null;
+  branches: string[];
+  /** Commits ahead/behind upstream; both 0 when there is no upstream. */
+  ahead: number;
+  behind: number;
+}

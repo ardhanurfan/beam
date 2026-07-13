@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "content too large" }, { status: 413 });
   }
   try {
-    const file = assertSkillPath(body.path);
+    const file = await assertSkillPath(body.path, "write");
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, body.content, "utf8");
     return NextResponse.json({ ok: true, path: file });

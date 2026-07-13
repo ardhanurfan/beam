@@ -5,8 +5,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  GitBranch,
+  Plus,
   RefreshCw,
   Undo2,
   GitCommitHorizontal,
@@ -14,7 +18,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
-import type { GitFileStatus } from "@/lib/types";
+import type { GitBranchInfo, GitFileStatus } from "@/lib/types";
 import { ROLLBACK_CONFIRM_TOKEN } from "@/lib/constants";
 import StackedDiff from "@/components/git/stacked-diff";
 import Sheet from "@/components/sheet";
@@ -39,6 +43,10 @@ export default function GitView() {
 
   const [activeRoot, setActiveRoot] = useState<string | null>(null);
   const [files, setFiles] = useState<GitFileStatus[]>([]);
+  const [branch, setBranch] = useState<GitBranchInfo | null>(null);
+  const [branchOpen, setBranchOpen] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [newBranch, setNewBranch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [diff, setDiff] = useState<string | null>(null);
@@ -86,6 +94,48 @@ export default function GitView() {
       cancelled = true;
     };
   }, [root, refreshTick, tab]);
+
+  // Branch info rides the same refresh cycle as the status list.
+  useEffect(() => {
+    if (!root || tab !== "git") return;
+    let cancelled = false;
+    fetch(`/api/git/branches?root=${encodeURIComponent(root)}`)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        if (!cancelled) setBranch(d);
+      })
+      .catch(() => !cancelled && setBranch(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [root, refreshTick, tab]);
+
+  async function checkout(name: string, create: boolean) {
+    if (!root) return;
+    setBusy(true);
+    setBranchError(null);
+    try {
+      const r = await fetch("/api/git/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ root, branch: name, create }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      pushActionLog(`✓ ${create ? "created & switched to" : "switched to"} ${name}`);
+      setBranchOpen(false);
+      setNewBranch("");
+      refresh();
+    } catch (err) {
+      // Stays in the sheet: the usual cause (local changes would be
+      // overwritten) is fixable right there via stash.
+      setBranchError((err as Error).message);
+      pushActionLog(`✗ checkout failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function showDiff(file: string) {
     if (!root) return;
@@ -272,6 +322,26 @@ export default function GitView() {
         )}
 
         <div className="px-4 py-3">
+          {/* Branch chip: current branch + ahead/behind, tap to switch */}
+          {branch && (
+            <button
+              onClick={() => setBranchOpen(true)}
+              className="mb-3 flex max-w-full items-center gap-2 rounded-pill border border-hairline px-3.5 py-2 active:bg-surface-soft"
+            >
+              <GitBranch size={15} className="shrink-0 opacity-70" />
+              <span className="min-w-0 truncate font-mono text-[13px] font-medium">
+                {branch.current ?? "detached HEAD"}
+              </span>
+              {(branch.ahead > 0 || branch.behind > 0) && (
+                <span className="shrink-0 font-mono text-[11px] opacity-60">
+                  {branch.ahead > 0 ? `↑${branch.ahead}` : ""}
+                  {branch.behind > 0 ? ` ↓${branch.behind}` : ""}
+                </span>
+              )}
+              <ChevronDown size={14} className="shrink-0 opacity-40" />
+            </button>
+          )}
+
           <div className="mb-2 flex items-center justify-between">
             <p className="eyebrow">Changes ({files.length})</p>
             <button
@@ -391,6 +461,84 @@ export default function GitView() {
             placeholder="Commit message"
             className="w-full rounded-xl border border-hairline px-3.5 py-3 text-[15px] outline-none focus:border-ink"
           />
+        </Sheet>
+      )}
+
+      {/* Branch switch / create (non-destructive: plain `git checkout`) */}
+      {branchOpen && branch && (
+        <Sheet
+          title="Branches"
+          onClose={() => {
+            setBranchOpen(false);
+            setBranchError(null);
+            setNewBranch("");
+          }}
+          bodyClassName="space-y-2"
+          footer={
+            <div className="flex items-center gap-2">
+              <input
+                value={newBranch}
+                onChange={(e) => setNewBranch(e.target.value)}
+                placeholder="new-branch-name"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className="min-h-11 min-w-0 flex-1 rounded-xl border border-hairline bg-canvas px-3.5 font-mono text-[14px] outline-none focus:border-ink"
+              />
+              <button
+                onClick={() => checkout(newBranch.trim(), true)}
+                disabled={busy || !newBranch.trim()}
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-pill bg-primary px-4 text-[14px] font-medium text-on-primary disabled:opacity-40"
+              >
+                <Plus size={15} />
+                {busy ? "…" : "Create"}
+              </button>
+            </div>
+          }
+        >
+          {files.length > 0 && (
+            <div className="flex items-center gap-3 rounded-xl bg-block-cream px-3 py-2.5">
+              <p className="min-w-0 flex-1 text-[13px] leading-snug opacity-80">
+                {files.length} uncommitted change{files.length === 1 ? "" : "s"} —
+                they carry over unless they conflict; git refuses rather than
+                overwrites.
+              </p>
+              <button
+                onClick={quickStash}
+                disabled={busy}
+                className="shrink-0 rounded-pill border border-hairline px-3 py-1.5 text-[12px] font-medium disabled:opacity-40"
+              >
+                Stash first
+              </button>
+            </div>
+          )}
+          {branchError && (
+            <p className="wrap-anywhere rounded-md bg-block-pink px-3 py-2 text-[13px]">
+              {branchError}
+            </p>
+          )}
+          <ul className="space-y-2">
+            {branch.branches.map((b) => {
+              const isCurrent = b === branch.current;
+              return (
+                <li key={b}>
+                  <button
+                    onClick={() => !isCurrent && checkout(b, false)}
+                    disabled={busy || isCurrent}
+                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${
+                      isCurrent ? "border-ink bg-surface-soft" : "border-hairline"
+                    } disabled:opacity-70`}
+                  >
+                    <GitBranch size={16} className="shrink-0 opacity-60" />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium">
+                      {b}
+                    </span>
+                    {isCurrent && <Check size={16} className="shrink-0" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </Sheet>
       )}
 
